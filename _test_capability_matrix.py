@@ -66,7 +66,7 @@ def _mcp工具():
 # 能力矩阵：能力 → (类别, CLI 子命令, MCP 工具, 必须穿透的参数, 测试文件或 None)
 矩阵 = [
     ("扫描活屏", "cap", "scan", "scan_screen",
-     {"incremental", "book", "background", "hwnd"}, "_test_mcp.py"),
+     {"incremental", "book", "background", "hwnd", "compact"}, "_test_mcp.py"),
     ("增量扫描", "cap", "scan", "scan_screen", {"incremental"}, "_test_incremental.py"),
     ("置前窗口", "cap", "activate", "activate_window", set(), "_test_mcp.py"),
     ("堆叠感知", "cap", "stack", "window_stack", {"occlude_hwnd"}, "_test_stack.py"),

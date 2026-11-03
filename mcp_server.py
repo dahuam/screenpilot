@@ -152,11 +152,11 @@ def _存追踪状态(桶key, 状态):
 
 def _扫描核心(win=None, no_focus=False, max_nodes=800, no_uia=False, no_ocr=False,
               no_visual=False, background=False, hwnd=None, incremental=None,
-              book=None):
+              book=None, compact=None):
     """scan 核心流程：调 sp.pipeline 并行管线（自动编号追踪）→ 标注图 + 缓存。
 
-    incremental/book 透传三态（None=智能默认）：book 三态映射到 no_book 时
-    不能用 `not book`（None 取反会错成强制不入库），须显式映射。
+    incremental/book/compact 透传三态（None=智能默认）：book 三态映射到
+    no_book 时不能用 `not book`（None 取反会错成强制不入库），须显式映射。
     """
     桶key = str(hwnd) if hwnd else (win if win else "screen")
     旧状态 = 追踪状态.get(桶key)
@@ -165,6 +165,7 @@ def _扫描核心(win=None, no_focus=False, max_nodes=800, no_uia=False, no_ocr=
                        background=background, hwnd=hwnd, incremental=incremental,
                        no_book=(True if book is False
                                 else (False if book else None)),
+                       compact=compact,
                        # None→{}：首帧也要建追踪器写快照，下一帧才能保号
                        tracker_state=旧状态 if 旧状态 is not None else {})
     meta, 元素, img = 结果["meta"], 结果["elements"], 结果["img"]
@@ -203,7 +204,8 @@ def _扫描核心(win=None, no_focus=False, max_nodes=800, no_uia=False, no_ocr=
 def scan_screen(window: str = None, no_focus: bool = False, max_nodes: int = 800,
                 no_uia: bool = False, no_ocr: bool = False, no_visual: bool = False,
                 background: bool = False, hwnd: int = None,
-                incremental: bool = None, book: bool = None) -> str:
+                incremental: bool = None, book: bool = None,
+                compact: bool = None) -> str:
     """扫描屏幕或指定窗口，返回带编号的结构化元素表（agent 操作屏幕的第一步）。
 
     连续扫描元素编号自动保持稳定（同元素保号，新元素追加新号；meta.tracker
@@ -226,14 +228,19 @@ def scan_screen(window: str = None, no_focus: bool = False, max_nodes: int = 800
             refreshed_rects/scroll_shift/content_shifted 可查。
         book: 是否把本次扫描写入元素书库，三态。None（默认）=智能：窗口扫描
             入库、全屏扫描不入库（桌面/任务栏噪声无检索价值；要全屏入库显式
-            传 true）；true=强制入库；false=强制不入库——临时扫描或屏幕上有
-            敏感内容（聊天/私密文件）时传 false，本次不落库、不建裁片。
+            传 true）；敏感窗口（记事本/聊天/密码登录类标题，名单 sp/privacy.py）
+            命中时智能默认改为不入库并报 meta.privacy_skip=true；true=强制
+            入库（不被隐私名单拦）；false=强制不入库——临时扫描或屏幕上有
+            敏感内容时传 false，本次不落库、不建裁片。
+        compact: 扫描档三态。None（默认）=compact 档：滤空文本非交互壳+同文本
+            同位去重（meta 报 compact_removed 统计），元素表更短更省上下文；
+            false=关（全量元素表，基准对照/怀疑滤多了用）；true=强制开（同默认）。
     """
     try:
         结果 = _扫描核心(win=window, no_focus=no_focus, max_nodes=max_nodes,
                        no_uia=no_uia, no_ocr=no_ocr, no_visual=no_visual,
                        background=background, hwnd=hwnd, incremental=incremental,
-                       book=book)
+                       book=book, compact=compact)
         结果["hint"] = ("按 id 调 click_element / type_text 操作元素；连续 scan 编号"
                       "自动保号，元素消失的编号不复用；界面已变的操作仍需重扫核对。"
                       "annotated_png 为标注图路径，可读图核对。")
@@ -332,7 +339,8 @@ def window_stack(limit: int = 40, occlude_hwnd: int = None) -> str:
 
 
 @mcp.tool()
-def crop_screen(element_id: int, pad: int = 0, out_path: str = None) -> str:
+def crop_screen(element_id: int, pad: int = 0, out_path: str = None,
+                force_refresh: bool = False) -> str:
     """按元素表编号裁片出图（两级视觉·看清通道）——原分辨率局部图，逐字可读。
 
     整屏图在模型视觉编码端被摊薄（糊），裁片是小图原生清晰：看不清元素上的
@@ -344,6 +352,9 @@ def crop_screen(element_id: int, pad: int = 0, out_path: str = None) -> str:
         element_id: scan_screen 返回的元素 id。
         pad: 裁片四周留白像素（默认 0=纯 bbox）。
         out_path: 裁片输出路径（缺省存 mcp_data\\crop_<时间戳>.png）。
+        force_refresh: 无视缓存直接重抓当前画面再裁（默认 false）。60s 内的
+            缓存裁片可能拍于动作之前——裁片用来核对「动作后画面」时务必传
+            true；注意 bbox 仍取同源元素表的坐标，画面大变请先重扫。
     """
     try:
         状态 = lastshot.status()
@@ -360,7 +371,8 @@ def crop_screen(element_id: int, pad: int = 0, out_path: str = None) -> str:
                     break
         if 目标 is None:
             raise ValueError("同源元素表中无编号 %s（请重新 scan_screen 刷新编号）" % element_id)
-        路径, 信息 = lastshot.crop_element(目标, pad=pad, out_path=out_path)
+        路径, 信息 = lastshot.crop_element(目标, pad=pad, out_path=out_path,
+                                         force_refresh=force_refresh)
         return _文本({"ok": True, "action": "crop", "id": element_id,
                      "text": (目标.get("text") or "")[:50],
                      "element_type": 目标.get("type"),
@@ -372,7 +384,7 @@ def crop_screen(element_id: int, pad: int = 0, out_path: str = None) -> str:
 
 @mcp.tool()
 def crop_xy(x1: int, y1: int, x2: int, y2: int, pad: int = 0,
-            out_path: str = None) -> str:
+            out_path: str = None, force_refresh: bool = False) -> str:
     """按屏幕物理坐标区域裁片出图（看清通道）——元素表漏识目标的兜底。
 
     坐标系与元素表/click_xy 完全同源（物理像素，DPI 感知）；从最近一次
@@ -384,9 +396,13 @@ def crop_xy(x1: int, y1: int, x2: int, y2: int, pad: int = 0,
         x2: 区域右下角 X。y2: 区域右下角 Y。
         pad: 裁片四周留白像素（默认 0）。
         out_path: 裁片输出路径（缺省存 mcp_data\\crop_xy_<时间戳>.png）。
+        force_refresh: 无视缓存直接重抓当前画面再裁（默认 false）。60s 内的
+            缓存裁片可能拍于动作之前——核对动作后的画面时务必传 true；
+            返回的 shot_time 是图的实际拍摄时间，可据此核对。
     """
     try:
-        路径, 信息 = lastshot.crop_xy(x1, y1, x2, y2, pad=pad, out_path=out_path)
+        路径, 信息 = lastshot.crop_xy(x1, y1, x2, y2, pad=pad, out_path=out_path,
+                                    force_refresh=force_refresh)
         return _文本({"ok": True, "action": "cropxy", "path": 路径, **信息,
                      "hint": "用读图工具打开 path 查看——原分辨率裁片，逐字可读。"})
     except Exception as e:

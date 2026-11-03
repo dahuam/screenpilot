@@ -161,12 +161,18 @@ def apply_expect(输出, expect, 默认hwnd=0, 默认win=None):
         报告 = wait_for(条件, 默认hwnd=默认hwnd, 默认win=默认win)
     except Exception as e:
         输出["ok"] = False
+        输出["action_executed"] = True  # 动作已发出，只是轮询验证没跑成
         输出["expect_error"] = "expect 轮询扫描失败: %s" % e
         return 输出
     输出["expect"] = 报告
     if not 报告["matched"]:
+        # 走到这里的前提是动作本身 ok（已发出）——ok=false 只表达「验证未命中」，
+        # 用 action_executed 把「动作已执行」单独说清，防 agent 误读成点击没生效
+        # 而对危险按钮重复点击（2026-11-04 实操体感评测·体验问题3）。
         输出["ok"] = False
-        输出["error"] = ("expect 未命中（timeout %gs 如实失败）：%s '%s'；"
+        输出["action_executed"] = True
+        输出["error"] = ("expect 未命中（timeout %gs 如实失败；动作已执行，"
+                         "未命中≠动作失败，勿盲目重复危险操作）：%s '%s'；"
                          "最后一次扫描证据见 expect.evidence"
                          % (报告["timeout_s"], 报告["mode"], 报告["find"]))
     return 输出

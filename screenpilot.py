@@ -590,7 +590,9 @@ def main(argv=None):
     sp_scan.add_argument("--no-book", action="store_true",
                          help="本次扫描不写入元素书库（临时/敏感屏幕用）")
     sp_scan.add_argument("--book", action="store_true",
-                         help="全屏扫描也写入书库（默认全屏不入库，仅窗口扫描入库）")
+                         help="全屏扫描也写入书库（默认全屏不入库，仅窗口扫描入库；"
+                              "敏感窗口——记事本/聊天/密码登录类标题——智能默认"
+                              "同样不入库并报 meta.privacy_skip，--book 显式强制）")
     sp_scan.add_argument("--incremental", action="store_true",
                          help="强制增量模式：与上帧差分只重扫变化区域（首帧存基线退全量；"
                               "meta.incremental/refreshed_rects 可查）。"

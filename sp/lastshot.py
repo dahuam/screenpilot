@@ -120,16 +120,20 @@ def status():
         return None
 
 
-def _取图():
+def _取图(force_refresh=False):
     """拿最近抓图：缓存未超龄直接用；超龄/损坏按原方式重抓（防旧图错位）。
+
+    force_refresh=True 跳过缓存直接重抓（核对类调用用：画面刚被动作改变、
+    60s 超龄线内也可能拿旧图，2026-11-04 实操体感评测·体验问题4）。
 
     返回 (img_bgr, offset, used, 状态)——used="cache"|"refreshed"；
     refreshed 时 offset 取重抓时实时窗口原点（窗口可能被挪动过）。
     """
-    缓存 = load()
-    if 缓存 is not None:
-        img, 状态 = 缓存
-        return img, list(状态.get("offset") or [0, 0]), "cache", 状态
+    if not force_refresh:
+        缓存 = load()
+        if 缓存 is not None:
+            img, 状态 = 缓存
+            return img, list(状态.get("offset") or [0, 0]), "cache", 状态
     状态 = status()
     if 状态 is None:
         raise RuntimeError("无最近抓图缓存（请先 scan / snap）")
@@ -137,17 +141,18 @@ def _取图():
     return img, list(offset), "refreshed", 状态
 
 
-def crop_xy(x1, y1, x2, y2, pad=0, out_path=None):
+def crop_xy(x1, y1, x2, y2, pad=0, out_path=None, force_refresh=False):
     """按屏幕物理坐标区域裁片（两级视觉·看清通道）。
 
     坐标系与元素表同源（物理像素）；区域换算到最近一次 scan/snap 的原图内
     裁出，原分辨率不缩放（定案①「存全截屏，根据屏幕分辨率裁片」）。
-    缓存超龄自动重抓（refetch）再裁，防「拿旧图裁新画面」错位。
+    缓存超龄自动重抓（refetch）再裁，防「拿旧图裁新画面」错位；
+    force_refresh=True 无视缓存直接重抓（画面刚变过的核对类裁片用）。
 
     返回 (裁片绝对路径, 信息 dict)：used=cache|refreshed、offset、
     shot_time（图的实际拍摄时间）、crop_size=[w,h]。
     """
-    img, offset, used, 状态 = _取图()
+    img, offset, used, 状态 = _取图(force_refresh=force_refresh)
     ox, oy = offset
     ix1, iy1 = int(min(x1, x2)) - int(pad) - ox, int(min(y1, y2)) - int(pad) - oy
     ix2, iy2 = int(max(x1, x2)) + int(pad) - ox, int(max(y1, y2)) + int(pad) - oy
@@ -171,13 +176,14 @@ def crop_xy(x1, y1, x2, y2, pad=0, out_path=None):
                  "shot_time": 状态.get("time"), "crop_size": [ix2 - ix1, iy2 - iy1]}
 
 
-def crop_element(el, pad=0, out_path=None):
+def crop_element(el, pad=0, out_path=None, force_refresh=False):
     """按元素 bbox 裁片（两级视觉·看清通道）。
 
     el：元素 dict（含 bbox）——必须来自与最近抓图同源的元素表
     （last_shot.json 的 elements_json 指向的那份，MCP crop_screen 工具负责
     同源查询；CLI 直接传用户 --file 查出的 dict）。bbox 为屏幕坐标，
     换算图内坐标后裁出，原分辨率不缩放。
+    force_refresh=True 无视缓存直接重抓（画面刚变过的核对类裁片用）。
     """
     bbox = el.get("bbox") if isinstance(el, dict) else getattr(el, "bbox", None)
     if not bbox or len(bbox) != 4:
@@ -185,4 +191,5 @@ def crop_element(el, pad=0, out_path=None):
     l, t, r, b = bbox
     if r - l < 1 or b - t < 1:
         raise ValueError("元素 bbox 尺寸异常: %s" % (bbox,))
-    return crop_xy(l, t, r, b, pad=pad, out_path=out_path)
+    return crop_xy(l, t, r, b, pad=pad, out_path=out_path,
+                   force_refresh=force_refresh)

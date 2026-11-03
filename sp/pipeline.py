@@ -25,7 +25,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-from . import booklib, capture, fuse, ocr_engine, stacking, template_engine, tracker, uia_engine, visual_engine
+from . import booklib, capture, fuse, ocr_engine, privacy, stacking, template_engine, tracker, uia_engine, visual_engine
 
 # 形状通道（☐☑○◉滑块）的 UIA 密度闸：它的价值场是 UIA 盲区（游戏设置页/
 # 自绘界面），而 UIA 富集窗口（explorer/Edge 等 ≥60 个 UIA 元素）里小方框/
@@ -312,9 +312,71 @@ def _标签伴生闸(visual列表, ocr列表):
     return visual列表
 
 
+# ---- compact 扫描档（2026-11-04 实操体感刀1）----
+# 病根（评测实证）：一次扫描 59 元素里约 18 个空文本壳（空 pane+空图标），
+# 菜单项 button+menu_item+text 三份同文本，单扫约 10KB 烧 agent 上下文。
+# 滤选必须在编号分配（assign_ids / IdTracker.apply）之前做，否则滤掉元素
+# 会造成 id 断号；滤选后的集合进 tracker 与增量基线，帧间保号口径前后一致。
+_COMPACT可交互类型 = frozenset((
+    "button", "edit", "checkbox", "combobox", "item", "link",
+    "menu_item", "tab", "tree_item", "radio", "slider"))
+# 同文本去重的保留优先序（序号小者优先）：可交互 > 非交互；同级保 UIA 源
+# （有 hwnd 可走控件级调用）再保 conf 高者
+_COMPACT交互序 = {"button": 0, "menu_item": 1, "edit": 2, "combobox": 3,
+                  "item": 4, "tab": 5, "tree_item": 6, "checkbox": 7,
+                  "radio": 8, "link": 9, "slider": 10}
+_COMPACT源序 = {"uia": 0, "ocr": 1, "visual": 2}
+
+
+def _compact归一文本(s):
+    """去重用的文本归一化：去全部空白 + 小写（中文原样）。"""
+    return "".join(str(s or "").split()).lower()
+
+
+def _compact同位(a, b):
+    """compact 去重的同位判定：bbox 互相包含或 IoU>0.3（须配合同文本才合并）。"""
+    al, at, ar, ab = a.bbox
+    bl, bt, br, bb = b.bbox
+    互相包含 = ((al <= bl and at <= bt and ar >= br and ab >= bb) or
+               (bl <= al and bt <= at and br >= ar and bb >= ab))
+    return 互相包含 or fuse._iou(a.bbox, b.bbox) > 0.3
+
+
+def _compact滤选(元素):
+    """compact 档两刀（2026-11-04 实操体感刀1），返回 (保留列表, 滤空数, 去重数)。
+
+    ① 滤空壳：空文本且非可交互的元素剔除（空 pane/group/无名字 icon——
+       只占编号烧上下文，agent 对它形不成任何操作意图）；可交互类型
+       （button/edit/menu_item 等）与 clickable 元素空文本也保留——点得到
+       比读得到重要（无文字图标按钮仍可按编号点击）。
+    ② 同文本去重：归一化文本相同且 bbox 包含/重叠的合并为一个（同一菜单项
+       button+menu_item+text 三份同文本实测），保留序见 _COMPACT交互序。
+       空文本元素不参与去重（两个无名控件同位≠同一元素，合并会误杀）。
+    """
+    原数 = len(元素)
+    保留 = [e for e in 元素
+            if e.text or e.type in _COMPACT可交互类型 or e.clickable]
+    滤空数 = 原数 - len(保留)
+
+    def 保序权重(e):
+        return (_COMPACT交互序.get(e.type, 99),
+                _COMPACT源序.get(e.source, 99),
+                -e.conf)
+
+    出 = []
+    for e in sorted(保留, key=保序权重):
+        归一 = _compact归一文本(e.text)
+        if not 归一:
+            出.append(e)   # 空文本不去重（防无名可交互控件被同位合并误杀）
+        elif not any(_compact归一文本(k.text) == 归一 and _compact同位(e, k)
+                     for k in 出):
+            出.append(e)
+    return 出, 滤空数, len(保留) - len(出)
+
+
 def scan(win=None, no_focus=False, max_nodes=800, no_uia=False, no_ocr=False,
          no_visual=False, background=False, hwnd=None, tracker_state=None,
-         incremental=None, no_book=None):
+         incremental=None, no_book=None, compact=None):
     """三引擎并行扫描核心。
 
     hwnd：窗口句柄直定位（优先于 win 标题；配合 background 天然非前台）。
@@ -332,7 +394,13 @@ def scan(win=None, no_focus=False, max_nodes=800, no_uia=False, no_ocr=False,
     no_book 三态（2026-11-01 A2 前为 False）：
       None（默认）= 智能：窗口扫描入库，全屏扫描不入库（桌面/任务栏噪声
         无检索价值，隐私敏感——screen 域 657 条存量即此成因，已清）；
-      True = 强制不入库；False = 强制入库（行为与 A2 前一致）。
+        智能默认下窗口标题命中隐私敏感名单（sp/privacy.py：记事本/聊天/
+        密码登录类）一律不入库并在 meta 报 privacy_skip（2026-11-04 刀2
+        红线）；True = 强制不入库；False = 强制入库（显式值不被隐私名单拦）。
+    compact 三态（2026-11-04 实操体感刀1）：
+      None（默认）= 开：融合后编号分配前滤空壳+同文本同位去重（meta 报
+        compact_removed 统计）；False = 关：全量元素表（行为与从前一致）；
+      True = 强制开（与默认同）。
 
     返回 dict：meta（time/duration_ms/screen/window/offset/counts/errors/
     background/bg_fallback，增量成功时另有 incremental/refreshed_rects，
@@ -609,6 +677,12 @@ def scan(win=None, no_focus=False, max_nodes=800, no_uia=False, no_ocr=False,
 
     元素 = fuse.fuse(盒子["uia列表"], ocr列表, visual列表)
 
+    # compact 滤选（实操体感刀1）：融合后、编号分配前——滤空壳+同文本同位
+    # 去重；滤选后的集合进 tracker/自然编号（id 不断号，帧间保号口径一致）
+    compact滤空 = compact去重 = 0
+    if compact is not False:
+        元素, compact滤空, compact去重 = _compact滤选(元素)
+
     追踪结果 = None
     if tracker_state is not None:
         追踪器 = tracker.IdTracker(tracker_state)
@@ -632,6 +706,15 @@ def scan(win=None, no_focus=False, max_nodes=800, no_uia=False, no_ocr=False,
         "errors": {"uia": 盒子["uia错误"], "ocr": ocr错误},
     }
     meta["url_host"] = 盒子.get("url_host")
+    # compact 档统计（实操体感刀1）：滤了多少如实可见；显式关时也如实标注
+    if compact is False:
+        meta["compact"] = False
+        meta["compact_removed"] = 0
+    else:
+        meta["compact"] = True
+        meta["compact_removed"] = compact滤空 + compact去重
+        meta["compact_detail"] = {"empty_dropped": compact滤空,
+                                  "same_text_merged": compact去重}
     # 增量扫描 meta（施工二）：增量成功报 incremental/refreshed_rects（屏幕坐标）
     # 与复用统计；退全量如实报 fallback 原因，禁止假增量
     if incremental:
@@ -696,10 +779,27 @@ def scan(win=None, no_focus=False, max_nodes=800, no_uia=False, no_ocr=False,
     # A2 三态：None=智能（窗口扫描入库，全屏不入库——桌面/任务栏噪声无检索
     # 价值，screen 域 657 条存量即此成因）；True/False=强制。
     入库 = (no_book is False) or (no_book is None and bool(win or hwnd))
+    # 隐私默认（实操体感刀2·P0 红线）：智能默认（no_book=None）下窗口标题
+    # 命中敏感名单（sp/privacy.py：记事本/写字板/密码登录/聊天类）→ 一律
+    # 不入库，meta.privacy_skip 如实告知；显式 book=True（no_book=False）/
+    # book=False 是调用方明示意志，不被名单拦。全屏模式维持原「不入库」
+    # 默认，不受名单影响。判定在 pipeline 一处做，CLI 与 MCP 两端同生效。
+    命中词 = None
+    if 入库 and no_book is None and (win or hwnd):
+        命中词 = (privacy.敏感命中(盒子["窗口名"])
+                  or privacy.敏感命中(win))
+        if 命中词:
+            入库 = False
     if not 入库:
         meta["book"] = {"skipped": True,
-                        "reason": ("no_book" if no_book
+                        "reason": ("privacy" if 命中词
+                                   else "no_book" if no_book
                                    else "fullscreen_default")}
+        if 命中词:
+            meta["privacy_skip"] = True
+            meta["privacy_note"] = ("窗口标题命中隐私敏感名单（命中「%s」）："
+                                    "本窗口扫描默认未写入元素书库；确实需要"
+                                    "入库请显式传 book=true 重扫" % 命中词)
     else:
         try:
             meta["book"] = booklib.入库(元素, img, meta)
