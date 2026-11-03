@@ -36,11 +36,14 @@ https://github.com/modelcontextprotocol/registry 的 schema 为准核对）：
 - `packages` 若不发 OCI 镜像，可换成 pip（PyPI 包发布后）或直接删节（registry 接受纯 GitHub repo 指针的提交形态，以当日 schema 为准）。
 - `name` 的 `io.github.dahuam` 前缀是 registry 对 GitHub 来源 server 的命名约定。
 
-## 2. 提交 PR 流程（模型上下文注册表）
+## 2. 提交流程（mcp-publisher CLI，官方现行通道）
 
-1. fork `modelcontextprotocol/registry`，在 `servers/` 下按当日模板加 `screenpilot.json`（或按新流程走 registry API 提交）。
-2. PR 描述直接复用 §4 的英文一句话+特性清单。
-3. CI 校验过 schema 后等 review；若要求演示，附 bench 报告与 README 截图。
+> 官方注册表已不接受 PR 提交 server（旧 PR 流程作废），现行通道为 mcp-publisher CLI 直发（2026-11-04 核实）。
+
+1. 安装：从 https://github.com/modelcontextprotocol/publisher/releases 下载对应平台二进制。
+2. 登录（device flow，浏览器完成 GitHub 授权，登录态本地留存）：`mcp-publisher login github`
+3. 在仓库根（`server.json` 所在目录）执行发布：`mcp-publisher publish`
+4. 验证：`curl "https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.dahuam/screenpilot"` 返回该 server 即成功。
 
 ## 3. 发布前置检查清单（提交前逐项打勾）
 
