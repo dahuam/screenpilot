@@ -1,0 +1,117 @@
+{
+ "version": 1,
+ "templates": [
+  {
+   "name": "后退",
+   "file": "后退_explorer.png",
+   "threshold": 0.93,
+   "type": "button",
+   "note": "Win11 资源管理器暗主题（bench GT 人工补标）"
+  },
+  {
+   "name": "前进",
+   "file": "前进_explorer.png",
+   "threshold": 0.93,
+   "type": "button",
+   "note": "Win11 资源管理器暗主题（bench GT 人工补标）"
+  },
+  {
+   "name": "上移",
+   "file": "上移_explorer.png",
+   "threshold": 0.93,
+   "type": "button",
+   "note": "Win11 资源管理器暗主题（bench GT 人工补标）"
+  },
+  {
+   "name": "刷新",
+   "file": "刷新_explorer.png",
+   "threshold": 0.93,
+   "type": "button",
+   "note": "Win11 资源管理器暗主题（bench GT 人工补标）"
+  },
+  {
+   "name": "最小化",
+   "file": "最小化_explorer.png",
+   "threshold": 0.94,
+   "type": "button",
+   "note": "Win11 资源管理器暗主题（bench GT 人工补标）"
+  },
+  {
+   "name": "最大化",
+   "file": "最大化_explorer.png",
+   "threshold": 0.94,
+   "type": "button",
+   "note": "Win11 资源管理器暗主题（bench GT 人工补标）"
+  },
+  {
+   "name": "关闭",
+   "file": "关闭_explorer.png",
+   "threshold": 0.94,
+   "type": "button",
+   "note": "Win11 资源管理器暗主题（bench GT 人工补标）"
+  },
+  {
+   "name": "标签页关闭",
+   "file": "标签页关闭_explorer.png",
+   "threshold": 0.93,
+   "type": "button",
+   "note": "Win11 资源管理器暗主题（bench GT 人工补标）"
+  },
+  {
+   "name": "刷新",
+   "file": "刷新_edge.png",
+   "threshold": 0.93,
+   "type": "button",
+   "note": "Edge 浏览器暗主题（bench raw 裁剪）"
+  },
+  {
+   "name": "新建标签页",
+   "file": "新建标签页_edge.png",
+   "threshold": 0.93,
+   "type": "button",
+   "note": "Edge 浏览器暗主题（bench raw 裁剪）"
+  },
+  {
+   "name": "最小化",
+   "file": "最小化_edge.png",
+   "threshold": 0.94,
+   "type": "button",
+   "note": "Edge 浏览器暗主题（bench raw 裁剪）"
+  },
+  {
+   "name": "关闭",
+   "file": "关闭_edge.png",
+   "threshold": 0.94,
+   "type": "button",
+   "note": "Edge 浏览器暗主题（bench raw 裁剪）"
+  },
+  {
+   "name": "标签页关闭",
+   "file": "标签页关闭_edge.png",
+   "threshold": 0.93,
+   "type": "button",
+   "note": "Edge 浏览器暗主题（bench raw 裁剪）"
+  },
+  {
+   "name": "最大化还原",
+   "file": "最大化还原_ldplayer.png",
+   "threshold": 0.94,
+   "type": "button",
+   "note": "雷电模拟器标题栏自绘（bench GT 人工补标）"
+  },
+  {
+   "name": "关闭",
+   "file": "关闭_ldplayer.png",
+   "threshold": 0.94,
+   "type": "button",
+   "note": "雷电模拟器标题栏自绘（bench GT 人工补标）"
+  },
+  {
+   "name": "最小化",
+   "file": "最小化_ldplayer.png",
+   "threshold": 0.94,
+   "type": "button",
+   "note": "雷电模拟器标题栏自绘最小化（bench raw 核验）"
+  }
+ ]
+}

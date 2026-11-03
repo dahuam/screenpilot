@@ -1,0 +1,11 @@
+# 识屏系统（screenpilot）依赖清单
+# Python 3.13，Windows；本机已全局安装的用 # 说明，可 pip install -r 本文件复现
+pyautogui>=0.9.54        # 鼠标键盘控制 + 截屏（0.9.54 已验证）
+rapidocr-onnxruntime>=1.2.3  # OCR 文字识别（1.2.3 已验证，CPU 推理）
+opencv-python>=5.0.0.93  # 视觉引擎连通域与图像处理（5.0.0.93 已验证）
+numpy>=2.5.3             # 数组运算（2.5.3 已验证）
+onnxruntime>=1.31.0      # RapidOCR 推理后端（1.31.0 已验证）
+pillow>=12.3.0           # 标注图渲染（12.3.0 已验证）
+uiautomation==2.0.29     # UIA 控件树（2.0.29 已验证，Python 3.13 兼容）
+pyperclip>=1.9.0         # 剪贴板（中文输入走 Ctrl+V 粘贴）
+tokenizers>=0.22.0       # SigLIP tokenizer（F3 bookvec 以图查库用；bench 同款已在用）

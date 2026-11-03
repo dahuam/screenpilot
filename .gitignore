@@ -1,0 +1,29 @@
+# ===== 本机数据资产（书库/备份/归档，不进版本库）=====
+manual/
+manual_backup_*/
+manual_archive/
+mcp_data/
+_debug/
+
+# ===== bench 数据（GT/场景截图/统考结果；脚本与代码照常入库）=====
+bench/results/
+bench/scenarios/
+bench/data/
+bench/__pycache__/
+
+# ===== 运行时活缓存（click 依赖，程序自管）=====
+__pycache__/
+*.pyc
+elements.json
+annotated_scan.png
+
+# ===== 内部工作文档与验收证据（开源 repo 另写 docs/，正本在记忆库/工作库）=====
+notes/
+positions/
+poc_*/
+验收_*/
+bench/*.md
+
+# ===== 本机杂项 =====
+*.log
+Thumbs.db
