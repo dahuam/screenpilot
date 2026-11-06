@@ -74,11 +74,17 @@ def _控件重定位(元素):
 
     被遮挡窗口的 ControlFromPoint 会拿到遮挡物的控件（物理坐标落在最顶层
     窗口上），此路线走 UIA 树后台遍历（UIA 读树不受遮挡影响），供后台操作。
+    前置 WM_NULL 泵探测（2s 上限）：挂死窗口的 ControlFromHandle 无超时
+    保护时可挂 30s+，探测先行——挂死即弃后台路线返回 None，调用方走物理
+    点击兜底（物理点击投递不依赖目标窗口泵消息，对挂死窗安全）。
     """
     hwnd = int(getattr(元素, "hwnd", 0) or 0) & 0xFFFFFFFF
     if not hwnd:
         return None
     try:
+        from . import uia_engine
+        uia_engine.ensure_timeout_engine()
+        uia_engine.窗口泵探测(hwnd)
         root = auto.ControlFromHandle(hwnd)
     except Exception:
         return None

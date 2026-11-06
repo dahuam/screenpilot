@@ -432,7 +432,7 @@ def scan(win=None, no_focus=False, max_nodes=800, no_uia=False, no_ocr=False,
         else:
             incremental = False
 
-    盒子 = {"uia列表": [], "uia错误": None, "窗口名": None, "区域": None,
+    盒子 = {"uia列表": [], "uia错误": None, "uia统计": None, "窗口名": None, "区域": None,
            "hwnd": None, "url_host": None, "rect就绪": threading.Event(),
            # 增量模式：主线程截图差分后决定是否跳过 UIA 遍历（UIA 元素复用
            # 上帧快照——遍历是窗口扫描的大头，雷电挂机负载下占 2s+）
@@ -477,9 +477,12 @@ def scan(win=None, no_focus=False, max_nodes=800, no_uia=False, no_ocr=False,
                     # 增量模式：等主线程差分决定（默认 false 时最多等 8s 后照跑）
                     盒子["增量决定"].wait(timeout=8)
                 if not (incremental and 盒子["跳uia遍历"]):
+                    uia统计 = {}
+                    盒子["uia统计"] = uia统计
                     盒子["uia列表"] = uia_engine.scan_uia(
                         root=uia_root, screen_wh=(sw, sh), max_nodes=max_nodes,
-                        root_hwnd=int(getattr(uia_root, "NativeWindowHandle", 0) or 0))
+                        root_hwnd=int(getattr(uia_root, "NativeWindowHandle", 0) or 0),
+                        error_stats=uia统计)
         except Exception as e:
             盒子["uia错误"] = str(e)
         finally:
@@ -705,6 +708,10 @@ def scan(win=None, no_focus=False, max_nodes=800, no_uia=False, no_ocr=False,
                    "total": len(元素)},
         "errors": {"uia": 盒子["uia错误"], "ocr": ocr错误},
     }
+    # UIA 遍历 COM 失败分类计数（P0三件套③）：非零才报，element_gone=元素
+    # 消失跳过合理，incomplete=超时/传输失败（树可能不完整），other=其余
+    if 盒子.get("uia统计"):
+        meta["errors"]["uia_stats"] = 盒子["uia统计"]
     meta["url_host"] = 盒子.get("url_host")
     # compact 档统计（实操体感刀1）：滤了多少如实可见；显式关时也如实标注
     if compact is False:
