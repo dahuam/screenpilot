@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """时间维度四件套 验收 —— ScreenPilot（2026-11-01 B1 转正）
 
-按 POC 原达标线复验（交接单 8858630744ea465da738a415658aee9a next_steps 三）：
+按 POC 原达标线复验（上轮交接 next_steps 三）：
   T1 抠底分层：UI 文本保留率≥95%；稳定框误收中位数≤10% 且超标框≤2；
      稳定移动轨迹≥1；产物三件齐（POC 判据①②③；真靶成绩 98.4%/0%/9 条）
   T2 连拍 toast：10 轮捕获 ≥9（POC v2 达标线，真靶 10/10）
@@ -12,7 +12,7 @@
      参数穿透由 _test_capability_matrix.py 静态校验；MCP 真通道机制已有
      _test_mcp.py 覆盖，本脚本不重复起 MCP 子进程）
 
-铁律：前台干扰型用例串行跑（铁律22）；tk 靶 place 绝对定位（铁律30）；
+纪律：前台干扰型用例串行跑；tk 靶 place 绝对定位；
 靶子 taskkill 即清、收尾删状态文件。
 
 用法：python _test_watch.py [--skip-long]

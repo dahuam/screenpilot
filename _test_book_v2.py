@@ -8,7 +8,7 @@
   4  旧库不丢：迁移后域条目数与 manual_backup_20261029 完全一致（565 条）
   5  域解析单元用例（url主机/解析域 纯逻辑，快速失败前置）
 
-靶纪律：计算器 + tk 自造靶（铁律15）；Edge 用完即关（自开的进程树 taskkill /T）。
+靶纪律：计算器 + tk 自造靶（固定自测靶）；Edge 用完即关（自开的进程树 taskkill /T）。
 用法：python _test_book_v2.py
 """
 import json

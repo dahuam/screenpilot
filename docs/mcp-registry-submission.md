@@ -60,6 +60,6 @@ https://github.com/modelcontextprotocol/registry 的 schema 为准核对）：
 
 ## 5. 对外名考古（三名板第一项依据）
 
-- 2026-10-23 定名铁律：「记得这是 ScreenPilot」——识屏系统所有产出物（README/MCP server 名与描述/代码文件头）一律带 ScreenPilot 署名；MCP server 命名定为 `xuanlan-screenpilot`。
+- 2026-10-23 定名决定：「记得这是 ScreenPilot」——识屏系统所有产出物（README/MCP server 名与描述/代码文件头）一律带 ScreenPilot 署名；MCP server 命名定为 `xuanlan-screenpilot`。
 - 2026-11-03 深夜拍板：对外名升格 **XuLan ScreenPilot**（含 XuLan 署名）；许可证=open core（开源核心侧 Apache-2.0 已落，增值集成闭源不入库）；GitHub 发布账号已定（详情在凭据文件）。
 - 署名口径（当窗定）：行文署名一律全名 XuLan ScreenPilot；技术 slug（MCP 实例名 xuanlan-screenpilot / 仓库名与包名 screenpilot / io.github.<owner>/screenpilot）保留小写不动。

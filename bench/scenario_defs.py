@@ -226,7 +226,7 @@ def prepare_startmenu(sp_module=None):
 
 
 def _登记靶窗(key):
-    """launch 后登记靶窗进会话账本（收台机制·launch 源，设计页 §5）。
+    """launch 后登记靶窗进会话账本（收台机制·launch 源，设计文档 §5）。
 
     bench 进程首次调用时开 bench 会话账本；找不到靶窗（如本就开着）返回 0，
     teardown 走按标题兜底。
@@ -285,7 +285,7 @@ def resolve_target(key):
 
 
 def teardown_scenario(key):
-    """收尾复原（收台机制：close_win 走 sp.cleanup 六门 WM_CLOSE，设计页 §5）。"""
+    """收尾复原（收台机制：close_win 走 sp.cleanup 六门 WM_CLOSE，设计文档 §5）。"""
     sc = SCENARIOS[key]
     how = sc.get("teardown")
     try:

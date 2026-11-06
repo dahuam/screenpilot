@@ -16,16 +16,16 @@ POC 原成绩（真靶）：v2 连拍抓 toast 10/10；v3 一隐一显打字 20/
   verify_typing          一隐一显：动作前抓基线，动作后短窗看指定区域是否变化
   probe_hang             ESC 卡死探测：发键后短窗看内容变化（屏幕通道——挂起
                          窗口不处理 WM_PRINT，PrintWindow 会永久阻塞，见 POC
-                         铁律级坑；屏幕拷贝是挂死观察唯一安全通道）
+                         实测大坑；屏幕拷贝是挂死观察唯一安全通道）
   split_static_dynamic   抠底动静态分层：多帧逐像素中位数抠 UI 底图，时间轴
                          标准差抠动态掩码，跨帧中心跟踪 + 净位移分实体/动画层
 
-红线（交接单 8858630744ea465da738a415658aee9a 第 5 条）：
+红线（上轮交接第 5 条）：
   - sp/ 现有九件能力行为零改动：本模块只读复用 capture / executor /
     ocr_engine / stacking，不改它们；
   - 重活（多帧采样/抠底）执行期间本进程降 BELOW_NORMAL 让路霸业挂机，
     finally 恢复原优先级（MCP 常驻进程不能永久降档）；
-  - 单进程串行纪律（台账铁律 23）；前台干扰型用例串行跑（铁律 22）。
+  - 单进程串行；前台干扰型用例串行跑（踩坑教训）。
 
 坐标约定：截图/元素 bbox 一律物理像素；region 默认给屏幕坐标
 [x1,y1,x2,y2]（与元素表同源），region_ref="window" 时按窗口图坐标解释。
@@ -425,7 +425,7 @@ def probe_hang(hwnd=None, window=None, key="esc", wait=2.0, interval=0.25,
                resend_after=0.7, settle=0.4, change_ratio=0.004, focus=True):
     """发键短窗观察：内容有变化=窗口活着，零变化=判卡死。
 
-    通道铁律（POC 实锤）：必须走屏幕拷贝——挂起窗口不处理 WM_PRINT，
+    通道纪律（POC 实锤）：必须走屏幕拷贝——挂起窗口不处理 WM_PRINT，
     PrintWindow 调用会永久阻塞。因此本函数要求窗口在前台且无遮挡：
     focus=True 先置前；置前失败或可见率 <0.95 时如实拒绝判定（判定不可信
     比不判定更糟）。按键是全局键盘事件，只发到前台窗口。

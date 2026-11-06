@@ -63,7 +63,7 @@ from sp.ocr_engine import preload as _ocr预热
 # F5：MCP 常驻进程启动即后台预热 OCR 模型（加载 4~6s），会话首扫只付推理账
 _ocr预热()
 
-# 收台机制（登记-清理两段式）：启动即开会话账本 + 扫上窗残留（设计页 §5）
+# 收台机制（登记-清理两段式）：启动即开会话账本 + 扫上窗残留（设计文档 §5）
 cleanup.init_session("mcp")
 cleanup.startup_scan()
 
@@ -113,7 +113,7 @@ mcp = FastMCP(
 
 
 def _文本(obj) -> str:
-    """工具结果统一为单行 JSON 文本；首调捎带残窗提醒（收台机制，设计页 §2）。"""
+    """工具结果统一为单行 JSON 文本；首调捎带残窗提醒（收台机制，设计文档 §2）。"""
     try:
         通知 = cleanup.take_notice()
         if 通知 and isinstance(obj, dict):
@@ -326,7 +326,7 @@ def _动作结果(动作, 元素id=None, 结果=None, 元素=None):
 
 
 def _动作差分(fn):
-    """六动作工具的差分登记装饰器（收台机制·登记段，设计页 §3）。
+    """六动作工具的差分登记装饰器（收台机制·登记段，设计文档 §3）。
 
     动作前 EnumWindows 快照 → 动作 → 差分，新增窗自动登记 action_diff
     （advisory：只报不自动关），返回体捎带 windows_opened。代价=每动作
@@ -960,7 +960,7 @@ def cleanup_windows(targets: list = None, force: bool = False) -> str:
 
 
 if __name__ == "__main__":
-    # 会话收口双保险（设计页 §2：stdio 断=会话收口，残窗清理靠机制）：
+    # 会话收口双保险（设计文档 §2：stdio 断=会话收口，残窗清理靠机制）：
     # finally 接 stdio 断开的正常退出；atexit 兜 interpretor 退出路径；幂等。
     import atexit
     atexit.register(cleanup.session_exit_cleanup)

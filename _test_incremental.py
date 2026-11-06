@@ -328,7 +328,7 @@ def main():
                 time.sleep(2)
             前OCR = 视口OCR文本(前表)
             # 滚动走 UIA ScrollPattern 控件级（2026-11-01 A2 单改造）：合成
-            # 滚轮对 Edge 无效（坑账实锤 clicks 语义仅个位 px）+ 后台进程置前
+            # 滚轮对 Edge 无效（实测记录 clicks 语义仅个位 px）+ 后台进程置前
             # 被前台锁拒——ScrollPattern 直调文档控件，不经鼠标不经前台
             from sp import uia_engine as _ue
             import uiautomation as _auto

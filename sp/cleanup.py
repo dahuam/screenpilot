@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
-"""收台机制（登记-清理两段式）—— ScreenPilot 单一真源（2026-11-06 设计页 §5）
+"""收台机制（登记-清理两段式）—— ScreenPilot 单一真源（2026-11-06 设计文档 §5）
 
-设计正本=screenpilot库 notes/设计-做完工作自动收台_20261106.md。
-事故根源=事件卡 #005（taskkill /IM 按进程名下刀误杀 explorer 与老板 Edge 窗）。
-老板拍板：「残窗清理靠机制不靠纪律」。
+事故根源=一次事故复盘（按进程名 taskkill 误杀 explorer 与用户 Edge 窗）。
+定案原则：「残窗清理靠机制不靠纪律」。
 
 两段式：
   登记段——三源进账（launch=bench 拉靶 / explicit=agent 显式登记 /
@@ -11,7 +10,7 @@
   清理段——WM_CLOSE 温和投递 × 三轮（SMTO_ABORTIFHUNG 2s cap，全程无
   taskkill），每窗过安全六门，清不掉的进残窗报告，下窗首调捎带提醒。
 
-安全六门（防 #005 重演，设计页 §4）：
+安全六门（防 #005 重演，设计文档 §4）：
   1 身份三验：IsWindow + pid 一致（hwnd 才是主键，防句柄回收张冠李戴）
   2 白名单永免：explorer/任务栏/任务管理器/ZCode 自身/系统外壳窗，名单可配置
   3 只认本会话账本：close_candidate（launch/explicit）才自动关，
@@ -46,7 +45,7 @@ PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 # 关窗实测参数（沿用 bench close_window_gently：三轮重试治暂态竞态）
 _轮间隔秒 = 0.8
 _轮间停秒 = 1.2
-_WM_CLOSE超时毫秒 = 2000  # 设计页 §4：2s cap，挂死窗不阻塞收台
+_WM_CLOSE超时毫秒 = 2000  # 设计文档 §4：2s cap，挂死窗不阻塞收台
 
 # 门2 默认白名单（exe 基名小写 / 窗口类名精确）；mcp_data/cleanup_whitelist.json
 # 存在则合并追加（只加不减，加免是放宽，收紧须改本文件+评审）
@@ -278,7 +277,7 @@ def register_hwnd(hwnd, source="explicit", close_candidate=True):
 
 
 def diff_register(前快照):
-    """动作差分登记（设计页 §3）：新增窗登记 action_diff（advisory 只报不关）。
+    """动作差分登记（设计文档 §3）：新增窗登记 action_diff（advisory 只报不关）。
 
     返回新增窗列表（供工具返回捎带 windows_opened）；无账本或无新增返回 []。
     """
@@ -435,7 +434,7 @@ def _wm_close(hwnd):
 
 
 def _窗在(hwnd):
-    """窗是否还在（按 hwnd 事实判定，不沿用旧判据——体感账 #14 教训）。"""
+    """窗是否还在（按 hwnd 事实判定，不沿用旧判据——体感记录 #14 教训）。"""
     return bool(user32.IsWindow(int(hwnd)) and user32.IsWindowVisible(int(hwnd)))
 
 
@@ -678,7 +677,7 @@ def startup_scan():
 
 
 def take_notice():
-    """首调吐通知（一次性；设计页：残窗闭环也靠机制不靠记性）。"""
+    """首调吐通知（一次性；残窗闭环也靠机制不靠记性）。"""
     global _通知
     n, _通知 = _通知, None
     return n

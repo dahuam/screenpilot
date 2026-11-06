@@ -203,7 +203,7 @@ def click(元素, force_physical=False, precise=False, check_top=True):
     （UIA 后台遍历）——防止误触发遮挡物。
 
     落点归窗核验（2026-10-28 堆叠感知层，根治「点了也不知道点没点到」）：
-    物理点击永远打在最顶层窗口（铁律19）。check_top=True（默认）时，
+    物理点击永远打在最顶层窗口。check_top=True（默认）时，
     元素带 hwnd 的物理点击在发点前先 WindowFromPoint 归根比对——归窗不是
     目标窗就拒绝点击（ok=False + top_window 说明谁挡着），把「点完才发现
     点错」变成「点前拦截」。check_top=False 是明确知情时的强点逃生口。

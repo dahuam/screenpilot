@@ -30,7 +30,7 @@ from . import pipeline
 默认timeout秒 = 10
 默认interval毫秒 = 800
 
-# 窗口消失类报错特征（体感账 #14：目标窗消失恰是 disappear 模式的成功态）。
+# 窗口消失类报错特征（体感记录 #14：目标窗消失恰是 disappear 模式的成功态）。
 # 注意「窗口无响应」不算——挂死≠消失，仍走正常轮询。
 _窗消失特征 = ("句柄已失效", "未找到标题含", "窗口可能已关闭")
 
@@ -129,7 +129,7 @@ def wait_for(条件, 默认hwnd=0, 默认win=None):
     }
     while True:
         轮数 += 1
-        # 窗口消失快判（体感账 #14 修复）：IsWindow=False 是 Win32 事实——
+        # 窗口消失快判（体感记录 #14 修复）：IsWindow=False 是 Win32 事实——
         # disappear 模式=目标窗没了=成功（verified_by_disappearance）；
         # appear 模式=窗都没了文本不可能出现，如实失败提前返回，不空轮询。
         if _窗没了(目标hwnd):
@@ -150,7 +150,7 @@ def wait_for(条件, 默认hwnd=0, 默认win=None):
             msg = str(e)
             窗关了 = any(k in msg for k in _窗消失特征)
             if 窗关了:
-                # 扫描通道报窗消失：与 IsWindow 同语义（体感账 #14 实锤场景
+                # 扫描通道报窗消失：与 IsWindow 同语义（体感记录 #14 实锤场景
                 # ——点关闭后轮询抛「句柄已失效」，旧代码把成功态报成 ok:false）
                 报告.update(scans=轮数,
                             elapsed_ms=int((time.monotonic() - 开始) * 1000),

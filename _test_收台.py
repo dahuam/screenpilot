@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
-"""收台机制（登记-清理两段式）全链路测试 —— ScreenPilot（2026-11-06 设计页 §5 施工）
+"""收台机制（登记-清理两段式）全链路测试 —— ScreenPilot（2026-11-06 设计文档 §5 施工）
 
-验收对照（设计页 §6）：
+验收对照（设计文档 §6）：
   T1-T4/T7-T10 本文件（六门/账本三源/差分/猝死/零触碰/expect 修复）
   T5-T6 记事本脏窗实测（验收 4：报「已修改」不关）——同文件内完成
 
-靶纪律：tk 自造靶（台账铁律9，notepad 有会话恢复坑）为主；记事本脏窗
+靶纪律：tk 自造靶（notepad 有会话恢复坑）为主；记事本脏窗
 实测一条（验收 4 明确要求记事本场景），收尾 UIA 点「不保存」彻底关净
-（体感账 2026-11-06 同款收台，TabState 实测不丢）。全程零 taskkill——
+（体感记录 2026-11-06 同款收台，TabState 实测不丢）。全程零 taskkill——
 猝死模拟用 os._exit（硬死不经 atexit/finally，与杀进程同语义）。
 
 用法：python _test_收台.py    （退出码 0=全过）
@@ -140,8 +140,8 @@ def main():
             if 前台 != np["hwnd"]:
                 raise RuntimeError("记事本置前失败（前台 hwnd=%s≠%s），"
                                    "拒绝盲打" % (前台, np["hwnd"]))
-            # 隔离：ctrl+n 开全新标签打字（体感账 12:34 同款），试验与
-            # 恢复出的老板标签零接触；收尾只关本试验标签
+            # 隔离：ctrl+n 开全新标签打字（体感记录 12:34 同款），试验与
+            # 恢复出的用户标签零接触；收尾只关本试验标签
             import pyautogui
             pyautogui.hotkey("ctrl", "n")
             time.sleep(1.2)
@@ -209,9 +209,9 @@ def main():
     现状 = {w["hwnd"] for w in cleanup.snapshot()}
     被误关 = [w["title"] for w in 基线 if w["hwnd"] not in 现状
              and "识屏自测靶" not in w["title"]]
-    检查("T9c 基线窗（含老板窗）零触碰", not 被误关, 被误关)
+    检查("T9c 基线窗（含用户窗）零触碰", not 被误关, 被误关)
 
-    # ---- T10 wait_for 消失判成功（体感账 #14 修复）----
+    # ---- T10 wait_for 消失判成功（体感记录 #14 修复）----
     靶3 = 拉靶()
     wm_close(靶3["hwnd"])
     time.sleep(1.5)
@@ -230,7 +230,7 @@ def main():
          (not rep2["matched"]) and rep2.get("window_gone"),
          {k: rep2[k] for k in ("matched", "window_gone")})
 
-    # ---- 收尾：只关试验标签（ctrl+w+不保存），老板标签零接触 ----
+    # ---- 收尾：只关试验标签（ctrl+w+不保存），用户标签零接触 ----
     步("收尾开始")
     if 脏关:
         import uiautomation as auto
@@ -268,11 +268,11 @@ def main():
                     return False
                 点钮(脏关["hwnd"], ("不保存", "Don\u2019t save", "Don't save"))
                 time.sleep(1.0)
-                # ③ 整窗 WM_CLOSE：弹框=有脏老板标签→点「取消」保内容（窗留）
+                # ③ 整窗 WM_CLOSE：弹框=有脏用户标签→点「取消」保内容（窗留）
                 wm_close(脏关["hwnd"])
                 time.sleep(1.5)
                 if 点钮(脏关["hwnd"], ("取消", "Cancel")):
-                    步("检测到脏老板标签→已点取消保内容，窗保留")
+                    步("检测到脏用户标签→已点取消保内容，窗保留")
                 # ④ 断言：试验字样标签已不在（TabItem 清单核验）
                 试签在 = False
                 try:

@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """两级视觉与文本通道 验收脚本（2026-10-28 设计方案施工单④）。
 
-靶=计算器（铁律15 固定自测靶；Win11 用 os.startfile('calculator:') 拉起，
-铁律30 交接单坑）。CLI 子进程端到端（与 MCP 共用 sp 管线，同套逻辑）。
+靶=计算器（固定自测靶；Win11 用 os.startfile('calculator:') 拉起，
+动结构必 grep 收干净纪律）。CLI 子进程端到端（与 MCP 共用 sp 管线，同套逻辑）。
 
 用例清单：
   1  scan 自动入库：meta.book 摘要 + manual/<计算器>/entries.json 有 button 条目

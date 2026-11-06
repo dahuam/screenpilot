@@ -98,7 +98,7 @@ Working system in daily use as the studio's screen channel. Known gaps are docum
 
 ## License
 
-Open core: the core engine in this repository is released under the [Apache License 2.0](LICENSE). Studio value-added integrations (closed source) are not part of this repository.
+Open core: the core engine in this repository is released under the [Apache License 2.0](LICENSE). Commercial value-added integrations (closed source) are not part of this repository.
 
 ## Acknowledgements
 
