@@ -23,10 +23,25 @@ timeout: 秒(默认10), interval: 毫秒(默认800)}，可加 window/hwnd 指定
 import json
 import time
 
+import ctypes
+
 from . import pipeline
 
 默认timeout秒 = 10
 默认interval毫秒 = 800
+
+# 窗口消失类报错特征（体感账 #14：目标窗消失恰是 disappear 模式的成功态）。
+# 注意「窗口无响应」不算——挂死≠消失，仍走正常轮询。
+_窗消失特征 = ("句柄已失效", "未找到标题含", "窗口可能已关闭")
+
+
+def _窗没了(hwnd):
+    if not hwnd:
+        return False
+    try:
+        return not ctypes.windll.user32.IsWindow(int(hwnd))
+    except Exception:
+        return False
 
 
 def 归一(text):
@@ -114,8 +129,40 @@ def wait_for(条件, 默认hwnd=0, 默认win=None):
     }
     while True:
         轮数 += 1
-        结果 = pipeline.scan(win=目标win, hwnd=目标hwnd, background=True,
-                             no_focus=True)
+        # 窗口消失快判（体感账 #14 修复）：IsWindow=False 是 Win32 事实——
+        # disappear 模式=目标窗没了=成功（verified_by_disappearance）；
+        # appear 模式=窗都没了文本不可能出现，如实失败提前返回，不空轮询。
+        if _窗没了(目标hwnd):
+            报告.update(scans=轮数,
+                        elapsed_ms=int((time.monotonic() - 开始) * 1000),
+                        matched=not appear, window_gone=True)
+            报告["evidence"] = {
+                "hit": not appear, "matches": [], "last_total": 0,
+                "last_texts": [],
+                "verified_by_disappearance": not appear,
+                "note": "IsWindow=False（窗口已关闭）",
+            }
+            return 报告
+        try:
+            结果 = pipeline.scan(win=目标win, hwnd=目标hwnd, background=True,
+                                 no_focus=True)
+        except Exception as e:
+            msg = str(e)
+            窗关了 = any(k in msg for k in _窗消失特征)
+            if 窗关了:
+                # 扫描通道报窗消失：与 IsWindow 同语义（体感账 #14 实锤场景
+                # ——点关闭后轮询抛「句柄已失效」，旧代码把成功态报成 ok:false）
+                报告.update(scans=轮数,
+                            elapsed_ms=int((time.monotonic() - 开始) * 1000),
+                            matched=not appear, window_gone=True)
+                报告["evidence"] = {
+                    "hit": not appear, "matches": [], "last_total": 0,
+                    "last_texts": [],
+                    "verified_by_disappearance": not appear,
+                    "note": "扫描报窗口已消失: %s" % msg[:120],
+                }
+                return 报告
+            raise
         元素 = 结果["elements"]
         报告["window"] = 结果["meta"].get("window") or 报告["window"]
         报告["bg_fallback"] = bool(结果["meta"].get("bg_fallback"))

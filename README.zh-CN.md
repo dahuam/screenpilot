@@ -125,7 +125,7 @@ Win32 `PrintWindow`（PW_RENDERFULLCONTENT，窗口自身绘制到内存位图�
 
 ## MCP server（xuanlan-screenpilot）—— agent 直接挂载
 
-`mcp_server.py` 把十七件工具包成 MCP server（stdio 传输，直 import `sp` 引擎包，OCR 模型
+`mcp_server.py` 把二十件工具包成 MCP server（stdio 传输，直 import `sp` 引擎包，OCR 模型
 进程内常驻）。ZCode 已配置（`~/.zcode/cli/config.json`
 → `mcp.servers.xuanlan-screenpilot`），会话启动即挂载。
 
@@ -148,6 +148,8 @@ Win32 `PrintWindow`（PW_RENDERFULLCONTENT，窗口自身绘制到内存位图�
 | `verify_typing` | verify | **一隐一显**：动作前抓基线，动作后短窗看 `region`（建议给回显区）是否变化——判定输入是否生效；`ocr_check=true` 附变化前后 OCR 文本 |
 | `probe_hang` | hang | **卡死探测**：发键（默认 esc）短窗看内容变化，零变化=判卡死。必须屏幕通道——PrintWindow 对挂起窗**永久阻塞**（POC 铁律级坑），挂死场景别用 scan/snap；要求窗口前台无遮挡，置前失败/可见率<0.95 如实拒绝判定 |
 | `split_static_dynamic` | split | **抠底动静态分层**：多帧逐像素中位数抠 UI 底图 + 时间轴标准差抠动态掩码 + 跨帧跟踪 + 净位移分层（实体/动画层）；`verify_ocr=true` 附 UI 文本保留率/稳定框误收量化 |
+| `register_window` | — | **登记窗口进会话账本**（收台机制·显式登记）：自己拉起的应用窗登记后，任务收尾 `cleanup_windows` 或会话收口自动 WM_CLOSE 温和关闭；`close_candidate=false` 只入账不自动关。不登记的窗永远不碰（2026-11-06 新增） |
+| `cleanup_windows` | — | **收台清理**（任务收尾调用）：按会话账本温和关窗，全程 WM_CLOSE 无 taskkill；六门安全链（身份三验→白名单永免→只认本会话账本→跨会话只报不关→脏窗只报不关→幸存者复判绝不强杀）；`targets` 可指定窗，`force=true` 跳过脏窗保护（白名单窗 force 也不碰）；关不掉的写残窗报告 `mcp_data/residual_report.json`（2026-11-06 新增） |
 
 agent 协议：`scan_screen` 拿编号表（需要窗口在前台时先 `activate_window`）→
 按编号 `click_element` / `type_text`（物理点击默认漂移落点）→ 界面变了重新
@@ -223,6 +225,28 @@ expect = {find: "文本子串", mode: "appear"|"disappear",
 实靶验收 8/8（`_test_stack.py`）：计算器被自测靶遮挡场景——前台判定/遮挡量化
 （ratio 0.915+blocker）/遮挡态点击拦截/置前后拦截解除+业务生效/hit_window 反馈
 /top_must 拦截/后台 scan 摘要全过。
+
+### 会话收台：做完工作自动收台（2026-11-06，定案「残窗清理靠机制不靠纪律」）
+
+事故根源：bench 清残留 `taskkill /IM` 按进程名下刀，误伤无辜窗。机制对策=
+**登记-清理两段式**（`sp/cleanup.py` 单一真源，bench 与 MCP 共用一份代码）：
+
+- **登记段**（三源进账，不靠纪律）：server 启动即开会话账本
+  （`mcp_data/sessions/`）；`register_window` 显式登记自己拉起的窗；
+  click/type/press_key/scroll 等六动作工具自动做前后 EnumWindows 差分，
+  动作新开的窗登记为 action_diff（advisory，只报不自动关）。
+- **清理段**（三个收口，同一份代码）：`cleanup_windows` 任务收口按账本温和关
+  （WM_CLOSE×3 轮 SMTO_ABORTIFHUNG，全程无 taskkill）；会话收口
+  try/finally + atexit 双挂（换窗/猝死自动清）；bench teardown import 同一模块。
+- **安全六门**（每窗关前逐一过）：①身份三验（hwnd+pid 一致，防句柄回收张冠李戴）
+  ②白名单永免（explorer/任务管理器/ZCode 自身等，`mcp_data/cleanup_whitelist.json`
+  可加免）③只认本会话账本 ④跨会话只报不关 ⑤脏窗三通道识别只报不关
+  ⑥幸存者复判——WM_CLOSE 关不掉的（模态/提权窗）写残窗报告，绝不升级强杀。
+- **残窗闭环靠机制不靠记性**：会话猝死时残窗报告落盘，下一会话首次工具调用
+  自动捎带提醒「上一会话遗留 N 窗」。
+
+验收=`_test_收台.py` 23/23（登记三源/差分/六门/猝死/零触碰/expect 修复）+
+bench 五场景 teardown 零残留 + 对老板开着窗的现场零误伤。
 
 ### 两级视觉与文本通道（2026-10-28，定案「这是你的眼睛必须让你看的清」）
 
@@ -378,7 +402,7 @@ python bench_scan.py 全屏 3 # 串行 vs 并行 同进程公平基准
 
 ```
 screenpilot.py        CLI 入口（扫描/操作/书库/时间维度共十九子命令；--bg/--hwnd/--precise）
-mcp_server.py         MCP stdio server（xuanlan-screenpilot，十七工具；background/hwnd/precise + 编号保号 + 堆叠协议 + 两级视觉 + 时间维度四件）
+mcp_server.py         MCP stdio server（xuanlan-screenpilot，二十工具；background/hwnd/precise + 编号保号 + 堆叠协议 + 两级视觉 + 时间维度四件 + 会话收台）
 sp/                   引擎包
   pipeline.py         扫描管线（三引擎并行：UIA 线程 A / OCR+视觉 线程 B / 主线程截图；后台抓窗+编号追踪+自动入库接线；scan_image 静态图识别）
   capture.py          截屏（DPI 感知，全屏/窗口区域/PrintWindow 后台抓窗；load_image 图片读入）

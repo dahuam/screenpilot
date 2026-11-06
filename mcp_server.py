@@ -50,16 +50,22 @@ enable_dpi_awareness()
 
 import json
 import time
+import functools
 from typing import Union
 
 from mcp.server.fastmcp import FastMCP
 
-from sp import annotate, booklib, capture, executor, lastshot, pipeline, stacking, uia_engine, waiter, watch
+from sp import annotate, booklib, capture, cleanup, executor, lastshot, \
+    pipeline, stacking, uia_engine, waiter, watch
 from sp.model import element_from_dict
 from sp.ocr_engine import preload as _ocr预热
 
 # F5：MCP 常驻进程启动即后台预热 OCR 模型（加载 4~6s），会话首扫只付推理账
 _ocr预热()
+
+# 收台机制（登记-清理两段式）：启动即开会话账本 + 扫上窗残留（设计页 §5）
+cleanup.init_session("mcp")
+cleanup.startup_scan()
 
 mcp = FastMCP(
     "xuanlan-screenpilot",
@@ -107,7 +113,13 @@ mcp = FastMCP(
 
 
 def _文本(obj) -> str:
-    """工具结果统一为单行 JSON 文本。"""
+    """工具结果统一为单行 JSON 文本；首调捎带残窗提醒（收台机制，设计页 §2）。"""
+    try:
+        通知 = cleanup.take_notice()
+        if 通知 and isinstance(obj, dict):
+            obj["residual_notice"] = 通知
+    except Exception:
+        pass
     return json.dumps(obj, ensure_ascii=False)
 
 
@@ -313,6 +325,31 @@ def _动作结果(动作, 元素id=None, 结果=None, 元素=None):
     })
 
 
+def _动作差分(fn):
+    """六动作工具的差分登记装饰器（收台机制·登记段，设计页 §3）。
+
+    动作前 EnumWindows 快照 → 动作 → 差分，新增窗自动登记 action_diff
+    （advisory：只报不自动关），返回体捎带 windows_opened。代价=每动作
+    一次 EnumWindows（毫秒级）。
+    """
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        前 = cleanup.snapshot()
+        r = fn(*args, **kwargs)
+        try:
+            新增 = cleanup.diff_register(前)
+            if 新增 and isinstance(r, str):
+                d = json.loads(r)
+                d["windows_opened"] = [{"hwnd": w["hwnd"],
+                                        "title": (w["title"] or "")[:60],
+                                        "pid": w["pid"]} for w in 新增]
+                r = json.dumps(d, ensure_ascii=False)
+        except Exception:
+            pass
+        return r
+    return wrapper
+
+
 @mcp.tool()
 def window_stack(limit: int = 40, occlude_hwnd: int = None) -> str:
     """窗口 Z 序全景（堆叠状态感知）——哪个窗在前台、目标窗被谁遮挡。
@@ -463,6 +500,7 @@ def book_find(query: str = None, domain: str = None, element_type: str = None,
 
 
 @mcp.tool()
+@_动作差分
 def click_element(element_id: int, physical: bool = False, precise: bool = False,
                   expect: Union[dict, str, None] = None,
                   check_top: bool = True) -> str:
@@ -500,6 +538,7 @@ def click_element(element_id: int, physical: bool = False, precise: bool = False
 
 
 @mcp.tool()
+@_动作差分
 def click_safe(element_id: int, expect: Union[dict, str, None] = None,
                physical: bool = False, precise: bool = False) -> str:
     """click_element 的安全版：业务生效判定（expect）必填 + 落点归窗核验恒开。
@@ -538,6 +577,7 @@ def click_safe(element_id: int, expect: Union[dict, str, None] = None,
 
 
 @mcp.tool()
+@_动作差分
 def click_xy(x: int, y: int, precise: bool = False,
              expect: Union[dict, str, None] = None,
              top_must: str = None) -> str:
@@ -575,6 +615,7 @@ def click_xy(x: int, y: int, precise: bool = False,
 
 
 @mcp.tool()
+@_动作差分
 def type_text(element_id: int, text: str, precise: bool = False,
               expect: Union[dict, str, None] = None) -> str:
     """按编号向元素输入文本（UIA 编辑框走 SetValue，中文走剪贴板粘贴，均安全）。
@@ -600,6 +641,7 @@ def type_text(element_id: int, text: str, precise: bool = False,
 
 
 @mcp.tool()
+@_动作差分
 def press_key(key: str) -> str:
     """按键或组合键。支持中文键名：回车/esc/tab/空格/退格/删除/上下左右/上翻页/下翻页，
     组合用 + 连接（如 ctrl+s、ctrl+shift+esc）。
@@ -615,6 +657,7 @@ def press_key(key: str) -> str:
 
 
 @mcp.tool()
+@_动作差分
 def scroll_screen(direction: str, pixels: int = 600) -> str:
     """在当前鼠标位置滚动页面。
 
@@ -858,5 +901,71 @@ def split_static_dynamic(window: str = None, hwnd: int = None, frames: int = 8,
 
 
 
+# ---------------- 收台机制两件（2026-11-06 登记-清理两段式）----------------
+
+@mcp.tool()
+def register_window(window: str, close_candidate: bool = True) -> str:
+    """登记窗口进会话账本（收台机制·显式登记）——收尾 cleanup_windows 会温和关它。
+
+    用于自己拉起的应用窗（subprocess/双击图标开的）：登记后任务收尾或会话
+    结束（stdio 断开）时自动 WM_CLOSE 温和关闭；不登记的窗永远不碰。
+    按标题子串匹配，命中多窗全登。
+
+    Args:
+        window: 窗口标题子串（如 "记事本"）。
+        close_candidate: true（默认）=自动关候选；false=只入账不自动关。
+    """
+    try:
+        条目 = cleanup.register_by_title(window, source="explicit",
+                                         close_candidate=close_candidate)
+        return _文本({"ok": True, "action": "register_window",
+                     "query": window, "registered": 条目,
+                     "count": len(条目),
+                     "hint": ("登记 %d 窗：会话收尾将 WM_CLOSE 温和关闭"
+                              "（白名单/脏窗保护恒生效）" % len(条目))
+                     if 条目 else "未命中任何可见窗（先 scan_screen 核对标题）"})
+    except Exception as e:
+        return _文本({"ok": False, "action": "register_window",
+                     "error": str(e)})
+
+
+@mcp.tool()
+def cleanup_windows(targets: list = None, force: bool = False) -> str:
+    """收台清理（任务收尾调用）——按会话账本温和关窗，全程 WM_CLOSE 无 taskkill。
+
+    清理顺序六门（防误伤，详=sp/cleanup.py）：身份三验（hwnd+pid）→ 白名单
+    永免（explorer/任务管理器/ZCode 自身等）→ 只认本会话登记的窗 → 脏内容
+    保护（「已修改/未保存」只报不关）→ WM_CLOSE×3 → 清不掉写残窗报告不强杀。
+
+    Args:
+        targets: 缺省 None=清本会话账本内全部自动关候选窗（launch/explicit
+            登记的）；也可传清单指定窗（int hwnd 或 str 标题子串混合）——
+            指定窗不受「只认本会话」限制，但白名单与身份验证恒生效。
+        force: true=跳过脏内容保护（对「已修改」窗也关；agent 判明后显式
+            决定用）。白名单窗 force 也不碰。
+
+    返回 closed（已关）/survivors（WM_CLOSE×3 仍在，已写残窗报告）/
+    dirty_skipped（脏窗只报不关）/skipped_whitelist（白名单永免）。
+    """
+    try:
+        结果 = cleanup.cleanup_windows(targets=targets, force=force)
+        结果["action"] = "cleanup_windows"
+        if 结果.get("ok"):
+            结果["hint"] = ("任务收尾建议：登记过的窗已温和关闭；survivors 已写"
+                           "残窗报告不强杀；dirty_skipped 是有未保存内容的窗，"
+                           "决定权在你（可 force=true 或自行保存后重清）。")
+        return _文本(结果)
+    except Exception as e:
+        return _文本({"ok": False, "action": "cleanup_windows", "error": str(e)})
+
+
 if __name__ == "__main__":
-    mcp.run(transport="stdio")
+    # 会话收口双保险（设计页 §2：stdio 断=会话收口，残窗清理靠机制）：
+    # finally 接 stdio 断开的正常退出；atexit 兜 interpretor 退出路径；幂等。
+    import atexit
+    atexit.register(cleanup.session_exit_cleanup)
+    try:
+        mcp.run(transport="stdio")
+    finally:
+        cleanup.session_exit_cleanup()
+

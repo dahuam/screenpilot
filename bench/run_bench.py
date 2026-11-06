@@ -285,6 +285,14 @@ def main():
     os.makedirs(out_dir, exist_ok=True)
     keys = [k for k in args.scenarios.split(",") if k]
 
+    # 收台机制：bench 中途崩（Ctrl+C/异常）时 atexit 兜底清本进程账本靶窗
+    try:
+        import atexit
+        from sp import cleanup as _cleanup
+        atexit.register(_cleanup.session_exit_cleanup)
+    except Exception:
+        pass
+
     print(f"=== ScreenPilot Bench · {args.tag} · rounds={args.rounds} ===")
     results = []
     for key in keys:

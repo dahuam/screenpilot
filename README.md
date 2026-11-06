@@ -32,6 +32,7 @@ On top of the table:
 - **Two-level vision + text channel** — crop any element at native resolution to read fine text/icons; a SigLIP vector book lets you find UI elements by name or by image without rescanning.
 - **Time dimension** — burst watch for toasts/transient feedback, show-verify for typing, ESC probe for hangs, and static/dynamic separation (UI base layer vs. moving entities) across frames.
 - **Business-level waits** — `expect {find, mode: appear|disappear}` makes a click "successful" only when the business evidence shows up on screen.
+- **Session cleanup** — a per-session ledger tracks windows the agent launched; `cleanup_windows` closes them at task end (WM_CLOSE only, six-gate safety chain, no taskkill); a crashed session leaves a residual report that the next session auto-surfaces.
 
 ## Install
 
@@ -83,7 +84,9 @@ Reproduce: `python bench/public_sspot.py --dataset v2` / `--dataset pro` (datase
 
 ## MCP server
 
-18 tools over stdio (`scan_screen`, `scan_image`, `click_element`, `click_safe`, `click_xy`, `type_text`, `press_key`, `scroll_screen`, `snap_screen`, `crop_screen`, `crop_xy`, `book_find`, `watch_burst`, `verify_typing`, `probe_hang`, `split_static_dynamic`, `window_stack`, `activate_window`). `scan_image` runs the same engines offline on a static file; `book_find` queries the persistent element book (two-level: text match + SigLIP vector search) so recurrent UIs are found without a full rescan.
+20 tools over stdio (`scan_screen`, `scan_image`, `click_element`, `click_safe`, `click_xy`, `type_text`, `press_key`, `scroll_screen`, `snap_screen`, `crop_screen`, `crop_xy`, `book_find`, `watch_burst`, `verify_typing`, `probe_hang`, `split_static_dynamic`, `window_stack`, `activate_window`, `register_window`, `cleanup_windows`). `scan_image` runs the same engines offline on a static file; `book_find` queries the persistent element book (two-level: text match + SigLIP vector search) so recurrent UIs are found without a full rescan.
+
+**Session cleanup** (register-then-clean, `sp/cleanup.py`): the server opens a session ledger on start; `register_window` logs windows the agent launched itself, and the six state-changing tools auto-log windows newly opened by an action (advisory only). At task end, `cleanup_windows` closes ledger windows gently — WM_CLOSE only, no taskkill anywhere — behind a six-gate safety chain: identity re-check (hwnd+pid), permanent whitelist (explorer / task manager / own process), own-session ledger only, cross-session windows report-only, dirty-content protection (unsaved work is never closed), and survivor re-check that reports instead of escalating. If a session dies, a residual report is written and the next session's first tool call surfaces it automatically.
 
 ## Documentation
 

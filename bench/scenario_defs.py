@@ -225,8 +225,31 @@ def prepare_startmenu(sp_module=None):
         return {"ok": False, "error": str(e)}
 
 
+def _登记靶窗(key):
+    """launch 后登记靶窗进会话账本（收台机制·launch 源，设计页 §5）。
+
+    bench 进程首次调用时开 bench 会话账本；找不到靶窗（如本就开着）返回 0，
+    teardown 走按标题兜底。
+    """
+    try:
+        from sp import cleanup
+        if cleanup.账本 is None:
+            cleanup.init_session("bench")
+        sc = SCENARIOS[key]
+        if sc.get("find") == "hwnd_class":
+            hits = find_hwnd_by_class(sc["win_class"])
+            n = 0
+            for h, _t in hits:
+                if cleanup.register_hwnd(int(h), source="launch"):
+                    n += 1
+            return n
+        return len(cleanup.register_by_title(sc["win"], source="launch"))
+    except Exception:
+        return 0
+
+
 def setup_scenario(key):
-    """按场景定义搭台：启动 → 等待。返回 dict(ok, error可选)。"""
+    """按场景定义搭台：启动 → 等待 → 靶窗登记。返回 dict(ok, error可选)。"""
     sc = SCENARIOS[key]
     try:
         if sc.get("prepare") == "startmenu":
@@ -235,7 +258,8 @@ def setup_scenario(key):
             sc["launch"]()
             if sc.get("launch_wait"):
                 time.sleep(sc["launch_wait"])
-        return {"ok": True}
+        登记数 = _登记靶窗(key)
+        return {"ok": True, "registered": 登记数}
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
@@ -261,11 +285,28 @@ def resolve_target(key):
 
 
 def teardown_scenario(key):
-    """收尾复原。返回 dict(ok, ...)。"""
+    """收尾复原（收台机制：close_win 走 sp.cleanup 六门 WM_CLOSE，设计页 §5）。"""
     sc = SCENARIOS[key]
     how = sc.get("teardown")
     try:
         if how == "close_win":
+            try:
+                from sp import cleanup
+                if cleanup.账本 is None:
+                    cleanup.init_session("bench")
+                res = cleanup.cleanup_windows()  # 账本自动关（含此前场景幸存者重试）
+                if res.get("ok") and (res.get("closed") or res.get("survivors")
+                                      or res.get("dirty_skipped")):
+                    surv = res.get("survivors", [])
+                    return {"ok": not surv, "window": sc["win"],
+                            "mode": "sp.cleanup",
+                            "closed": [c.get("title", "") for c in res.get("closed", [])],
+                            "survivors": len(surv),
+                            "dirty_skipped": [d.get("title", "")
+                                              for d in res.get("dirty_skipped", [])],
+                            **({"error": "WM_CLOSE×3 后仍在，已写残窗报告"} if surv else {})}
+            except Exception:
+                pass  # 收台通道异常兜底旧路
             return close_window_gently(sc["win"])
         if how == "alt_f4":
             import pyautogui
