@@ -1,0 +1,12 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.dahuam/screenpilot",
+  "title": "XuLan ScreenPilot",
+  "description": "Turn the real Windows screen into a numbered element table your AI agent can operate.",
+  "version": "1.0.0",
+  "repository": {
+    "url": "https://github.com/dahuam/screenpilot",
+    "source": "github"
+  },
+  "websiteUrl": "https://github.com/dahuam/screenpilot"
+}
