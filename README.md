@@ -8,6 +8,14 @@
 
 Pure local CPU. No cloud model, no GPU, no API key.
 
+## Highlights in v1.0.0
+
+- **Compact scan mode, on by default** — empty non-interactive shells and duplicate labels are filtered before numbering: a typical scan drops ~23% of elements and prompt tokens while keeping every interactive control (`compact=false` restores the raw table; `meta.compact_removed` reports what was filtered).
+- **Privacy-first element book, on by default** — scans of sensitive windows (Notepad, chat apps, login dialogs) are recognized as usual but never written into the persistent element book (`meta.privacy_skip`); an explicit `book=true` overrides.
+- **Hang-proof UIA calls** — a target window that stops responding surfaces as a structured error in ~2 s (message-pump probe) instead of blocking 30 s+; UIA calls carry configurable timeouts, and COM failures are classified and counted in `meta.errors.uia_stats`.
+- **Unambiguous `expect` semantics** — a timed-out business wait no longer collapses into `ok=false`: `action_executed` distinguishes "the click was sent but no evidence appeared" from "the action itself failed", so risky buttons are not blindly retried.
+- **Fresh crops on demand** — `crop_screen` / `crop_xy` accept `force_refresh` to bypass the 60 s shot cache when verifying a screen right after an action.
+
 ## How it works
 
 Three engines run in parallel and fuse into one element table (priority `UIA > OCR > visual`):
