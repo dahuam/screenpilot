@@ -224,8 +224,13 @@ def wait_for(条件, 默认hwnd=0, 默认win=None):
             }
             return 报告
         try:
+            # incremental=False（2026-11-15·玄览当窗 tk 靶诊断实锤）：智能增量在
+            # 同窗 60s 内自动开启，kept 条目复用旧 text——expect 判据「某文本
+            # 出现/消失」若吃到旧值即成盲区（点击改标题后轮询一直读到旧标题，
+            # appear 永不命中）。轮询语义=看当下真实画面，强制全量（tk 小窗
+            # 全量 ~0.5s/轮，轮询间隔 0.8s，可接受）。
             结果 = pipeline.scan(win=目标win, hwnd=目标hwnd, background=True,
-                                 no_focus=True)
+                                 no_focus=True, incremental=False)
         except Exception as e:
             msg = str(e)
             窗关了 = any(k in msg for k in _窗消失特征)
