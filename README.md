@@ -8,6 +8,17 @@
 
 Pure local CPU. No cloud model, no GPU, no API key.
 
+## What's new in v1.1.0 (2026-11-15)
+
+All six changes were driven by *our own agent's real usage logs* — the dogfooding ledger is the only source of iteration here.
+
+- **Baseline-diffed `expect: appear`** — when the evidence text already exists in the window body (editors, chat transcripts), a plain substring match "succeeds" on the old text before the real popup ever shows. `appear` now snapshots the pre-action element table and only accepts *new* hits; `diff=false` restores the old "already present counts" semantics, and when no baseline is available it falls back with `expect.diff_note` saying so.
+- **Expect polling sees the current frame** — the polling scan behind `expect` is forced to a full rescan; incremental kept-entries reuse stale text, which could turn a wait-for-evidence into a blind spot.
+- **Half the response tokens** — MCP tools returned the payload twice (text + `structuredContent` mirror); all 20 tools now ship text-only (`structured_output=False`).
+- **Ambiguous same-name elements disambiguated** — when a text label and a clickable button share the same caption, the clickable one gets a `[btn] ` prefix so agents stop clicking the inert text.
+- **Off-screen ghosts labeled** — windows with coordinates outside the virtual desktop (hung/misbehaving apps) are now flagged `off_screen: true` in `window_stack` / `who_at` / occlusion reports instead of surfacing million-pixel rects that beg for a hopeless click.
+- **`crop` reports the real capture time** — `force_refresh` regrabs now rewrite the returned `shot_time` to the actual capture moment (the "is this frame fresh?" signal used to lie).
+
 ## Highlights in v1.0.0
 
 - **Compact scan mode, on by default** — empty non-interactive shells and duplicate labels are filtered before numbering: a typical scan drops ~23% of elements and prompt tokens while keeping every interactive control (`compact=false` restores the raw table; `meta.compact_removed` reports what was filtered).
