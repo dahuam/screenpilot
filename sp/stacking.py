@@ -98,14 +98,29 @@ def foreground_hwnd():
     return int(user32.GetForegroundWindow() or 0)
 
 
+def _虚拟屏():
+    """虚拟桌面边界（含所有显示器的并集），供屏外窗判定。"""
+    return (user32.GetSystemMetrics(76), user32.GetSystemMetrics(77),
+            user32.GetSystemMetrics(76) + user32.GetSystemMetrics(78),
+            user32.GetSystemMetrics(77) + user32.GetSystemMetrics(79))
+
+
 def _窗口信息(hwnd, fg):
+    r = _rect(hwnd)
     return {
         "hwnd": int(hwnd),
         "title": _窗口标题(hwnd),
         "cls": _类名(hwnd),
-        "rect": _rect(hwnd),
+        "rect": r,
         "foreground": int(hwnd) == fg,
         "minimized": bool(user32.IsIconic(hwnd)),
+        # 屏外窗标注（体感账 #8：hexin_UserEnum rect 千万像素级乱码值原样吐出
+        # 无标注，agent 易误判可交互）——rect 与虚拟屏幕完全不相交=不可物理
+        # 点击（置前后可能回来，别拿它的 bbox 直接点）。误报方向安全：真窗
+        # 偶尔被挪到屏外时本来也点不到。
+        "off_screen": bool(
+            r and (r[2] <= 0 or r[3] <= 0
+                   or r[0] >= _虚拟屏()[2] or r[1] >= _虚拟屏()[3])),
     }
 
 

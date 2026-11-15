@@ -127,7 +127,10 @@ def _取图(force_refresh=False):
     60s 超龄线内也可能拿旧图，2026-11-04 实操体感评测·体验问题4）。
 
     返回 (img_bgr, offset, used, 状态)——used="cache"|"refreshed"；
-    refreshed 时 offset 取重抓时实时窗口原点（窗口可能被挪动过）。
+    refreshed 时 offset 取重抓时实时窗口原点（窗口可能被挪动过），
+    且状态的 time/epoch 改写为本次重抓实际时刻（体感账 #15：shot_time
+    是 agent 判帧新旧的唯一依据，重抓后仍报旧登记时间=说谎比没有更危险；
+    只改本函数返回的副本，last_shot.json 不回写——同源元素表对齐设计不变）。
     """
     if not force_refresh:
         缓存 = load()
@@ -138,7 +141,8 @@ def _取图(force_refresh=False):
     if 状态 is None:
         raise RuntimeError("无最近抓图缓存（请先 scan / snap）")
     img, offset, _win = refetch(状态)
-    return img, list(offset), "refreshed", 状态
+    return img, list(offset), "refreshed", {**状态, "epoch": time.time(),
+                                            "time": time.strftime("%Y-%m-%d %H:%M:%S")}
 
 
 def crop_xy(x1, y1, x2, y2, pad=0, out_path=None, force_refresh=False):

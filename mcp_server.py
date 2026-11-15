@@ -208,11 +208,17 @@ def _扫描核心(win=None, no_focus=False, max_nodes=800, no_uia=False, no_ocr=
     for d in 缓存["elements"]:
         if len(d["text"]) > 40:
             d["text"] = d["text"][:40] + "…"
+    # 同名可点标注（体感账 2026-11-15 接力派单：同名 text/button 消歧）——
+    # 元素缓存已在上面落盘，这里只改返回副本，缓存原件与入库 text 不动
+    try:
+        pipeline.同名可点标注(缓存["elements"])
+    except Exception:
+        pass
     缓存["meta"]["annotated_png"] = 标注路径
     return 缓存
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 def scan_screen(window: str = None, no_focus: bool = False, max_nodes: int = 800,
                 no_uia: bool = False, no_ocr: bool = False, no_visual: bool = False,
                 background: bool = False, hwnd: int = None,
@@ -261,7 +267,7 @@ def scan_screen(window: str = None, no_focus: bool = False, max_nodes: int = 800
         return _文本({"ok": False, "error": "scan 失败: %s" % e})
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 def scan_image(image_path: str, out_path: str = None, no_ocr: bool = False,
                no_visual: bool = False) -> str:
     """静态图片识别：对图片文件跑 OCR+视觉双引擎，输出与活屏扫描同构的元素表。
@@ -296,7 +302,7 @@ def scan_image(image_path: str, out_path: str = None, no_ocr: bool = False,
         return _文本({"ok": False, "error": "scan_image 失败: %s" % e})
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 def activate_window(window: str, wait: float = 0.4) -> str:
     """按标题子串激活（置前）窗口，返回窗口名与屏幕矩形。
 
@@ -350,7 +356,7 @@ def _动作差分(fn):
     return wrapper
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 def window_stack(limit: int = 40, occlude_hwnd: int = None) -> str:
     """窗口 Z 序全景（堆叠状态感知）——哪个窗在前台、目标窗被谁遮挡。
 
@@ -369,13 +375,15 @@ def window_stack(limit: int = 40, occlude_hwnd: int = None) -> str:
             结果["occlusion"] = stacking.occlusion(occlude_hwnd)
         结果["hint"] = ("foreground=当前焦点窗；windows 按 Z 序（首个最顶层）。"
                        "对 foreground=False 且被遮挡的窗：物理点击会点到遮挡物，"
-                       "先 activate_window 置前，或用 UIA 控件级/background 通道。")
+                       "先 activate_window 置前，或用 UIA 控件级/background 通道。"
+                       "off_screen=true 的窗 rect 在虚拟屏幕外（幽灵/乱坐标窗），"
+                       "bbox 不可直接点击，忽略或先置前。")
         return _文本(结果)
     except Exception as e:
         return _文本({"ok": False, "action": "stack", "error": str(e)})
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 def crop_screen(element_id: int, pad: int = 0, out_path: str = None,
                 force_refresh: bool = False) -> str:
     """按元素表编号裁片出图（两级视觉·看清通道）——原分辨率局部图，逐字可读。
@@ -419,7 +427,7 @@ def crop_screen(element_id: int, pad: int = 0, out_path: str = None,
         return _文本({"ok": False, "action": "crop", "id": element_id, "error": str(e)})
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 def crop_xy(x1: int, y1: int, x2: int, y2: int, pad: int = 0,
             out_path: str = None, force_refresh: bool = False) -> str:
     """按屏幕物理坐标区域裁片出图（看清通道）——元素表漏识目标的兜底。
@@ -446,7 +454,7 @@ def crop_xy(x1: int, y1: int, x2: int, y2: int, pad: int = 0,
         return _文本({"ok": False, "action": "cropxy", "error": str(e)})
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 def book_find(query: str = None, domain: str = None, element_type: str = None,
               limit: int = 30, include_legacy: bool = False,
               image: str = None) -> str:
@@ -499,7 +507,7 @@ def book_find(query: str = None, domain: str = None, element_type: str = None,
         return _文本({"ok": False, "action": "book_find", "error": str(e)})
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 @_动作差分
 def click_element(element_id: int, physical: bool = False, precise: bool = False,
                   expect: Union[dict, str, None] = None,
@@ -514,7 +522,12 @@ def click_element(element_id: int, physical: bool = False, precise: bool = False
         physical: 跳过 UIA 控件级调用，直接物理点击坐标（控件级调用无效时用）。
         precise: 像素级精准落点（默认 False=漂移点击）。
         expect: 可选业务生效判定 {find: "文本子串", mode: "appear"|"disappear",
-            timeout: 秒(默认10), interval: 毫秒(默认800)}（或其 JSON 字符串）。
+            timeout: 秒(默认10), interval: 毫秒(默认800), diff: bool(默认true)}
+            （或其 JSON 字符串）。appear 默认带动作前基线差分——只认动作后
+            新增命中，防「编辑器/聊天窗正文含判据词假命中」（体感账 #13）；
+            要「已存在即成功」旧语义显式传 diff:false。基线取自最近一次
+            同窗 scan/snap 缓存（≤60s），不可用时自动退回全文匹配并在
+            expect.diff_note 注明。
             点击发出后轮询扫描该元素所属窗口，条件成立才算成功返回；超时如实
             返回未命中并附最后一次扫描证据（expect.evidence）。OCR/视觉来源
             元素无 hwnd 时需在 expect 里指定 window 或 hwnd。默认不等待。
@@ -537,7 +550,7 @@ def click_element(element_id: int, physical: bool = False, precise: bool = False
         return _文本({"ok": False, "action": "click", "id": element_id, "error": str(e)})
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 @_动作差分
 def click_safe(element_id: int, expect: Union[dict, str, None] = None,
                physical: bool = False, precise: bool = False) -> str:
@@ -550,7 +563,12 @@ def click_safe(element_id: int, expect: Union[dict, str, None] = None,
     Args:
         element_id: scan_screen 返回的元素 id。
         expect: 必填业务生效判定 {find: "文本子串", mode: "appear"|"disappear",
-            timeout: 秒(默认10), interval: 毫秒(默认800)}（或其 JSON 字符串）。
+            timeout: 秒(默认10), interval: 毫秒(默认800), diff: bool(默认true)}
+            （或其 JSON 字符串）。appear 默认带动作前基线差分——只认动作后
+            新增命中，防「编辑器/聊天窗正文含判据词假命中」（体感账 #13）；
+            要「已存在即成功」旧语义显式传 diff:false。基线取自最近一次
+            同窗 scan/snap 缓存（≤60s），不可用时自动退回全文匹配并在
+            expect.diff_note 注明。
             点击发出后轮询扫描该元素所属窗口，条件成立才算成功返回；超时如实
             返回未命中并附最后一次扫描证据（expect.evidence）。OCR/视觉来源
             元素无 hwnd 时需在 expect 里指定 window 或 hwnd。
@@ -576,7 +594,7 @@ def click_safe(element_id: int, expect: Union[dict, str, None] = None,
         return _文本({"ok": False, "action": "click_safe", "id": element_id, "error": str(e)})
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 @_动作差分
 def click_xy(x: int, y: int, precise: bool = False,
              expect: Union[dict, str, None] = None,
@@ -599,7 +617,12 @@ def click_xy(x: int, y: int, precise: bool = False,
         y: 目标物理像素 Y 坐标。
         precise: 像素级精准落点（默认 False=漂移点击）。
         expect: 可选业务生效判定 {find: "文本子串", mode: "appear"|"disappear",
-            timeout: 秒(默认10), interval: 毫秒(默认800)}（或其 JSON 字符串）。
+            timeout: 秒(默认10), interval: 毫秒(默认800), diff: bool(默认true)}
+            （或其 JSON 字符串）。appear 默认带动作前基线差分——只认动作后
+            新增命中，防「编辑器/聊天窗正文含判据词假命中」（体感账 #13）；
+            要「已存在即成功」旧语义显式传 diff:false。基线取自最近一次
+            同窗 scan/snap 缓存（≤60s），不可用时自动退回全文匹配并在
+            expect.diff_note 注明。
             点击发出后轮询扫描等待，条件成立才算成功返回；超时如实返回未命中
             并附证据（expect.evidence）。坐标点击无所属窗口，expect 必须指定
             window（标题子串）或 hwnd，否则拒判。默认不等待。
@@ -614,7 +637,7 @@ def click_xy(x: int, y: int, precise: bool = False,
         return _文本({"ok": False, "action": "clickxy", "error": str(e)})
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 @_动作差分
 def type_text(element_id: int, text: str, precise: bool = False,
               expect: Union[dict, str, None] = None) -> str:
@@ -625,7 +648,12 @@ def type_text(element_id: int, text: str, precise: bool = False,
         text: 要输入的文本，支持中文与换行。
         precise: 聚焦点击用像素级精准落点（默认 False=漂移点击聚焦）。
         expect: 可选业务生效判定 {find: "文本子串", mode: "appear"|"disappear",
-            timeout: 秒(默认10), interval: 毫秒(默认800)}（或其 JSON 字符串）。
+            timeout: 秒(默认10), interval: 毫秒(默认800), diff: bool(默认true)}
+            （或其 JSON 字符串）。appear 默认带动作前基线差分——只认动作后
+            新增命中，防「编辑器/聊天窗正文含判据词假命中」（体感账 #13）；
+            要「已存在即成功」旧语义显式传 diff:false。基线取自最近一次
+            同窗 scan/snap 缓存（≤60s），不可用时自动退回全文匹配并在
+            expect.diff_note 注明。
             输入发出后轮询扫描该元素所属窗口，条件成立才算成功返回；超时如实
             返回未命中并附证据（expect.evidence）。OCR/视觉来源元素无 hwnd 时
             需在 expect 里指定 window 或 hwnd。默认不等待。
@@ -640,7 +668,7 @@ def type_text(element_id: int, text: str, precise: bool = False,
         return _文本({"ok": False, "action": "type", "id": element_id, "error": str(e)})
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 @_动作差分
 def press_key(key: str) -> str:
     """按键或组合键。支持中文键名：回车/esc/tab/空格/退格/删除/上下左右/上翻页/下翻页，
@@ -656,7 +684,7 @@ def press_key(key: str) -> str:
         return _文本({"ok": False, "action": "key", "error": str(e)})
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 @_动作差分
 def scroll_screen(direction: str, pixels: int = 600) -> str:
     """在当前鼠标位置滚动页面。
@@ -672,7 +700,7 @@ def scroll_screen(direction: str, pixels: int = 600) -> str:
         return _文本({"ok": False, "action": "scroll", "error": str(e)})
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 def snap_screen(window: str = None, out_path: str = None, background: bool = False,
                 hwnd: int = None) -> str:
     """截屏保存，返回图片绝对路径（可直接读图查看屏幕现状）。
@@ -769,7 +797,7 @@ def _工具动作(action):
     raise ValueError("action 须为 JSON 对象或对象数组")
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 def watch_burst(window: str = None, hwnd: int = None, seconds: float = 3.0,
                 interval: float = 0.2, region: str = None,
                 action: Union[dict, str, None] = None, rebase: bool = True,
@@ -804,7 +832,7 @@ def watch_burst(window: str = None, hwnd: int = None, seconds: float = 3.0,
         return _文本({"ok": False, "action": "watch_burst", "error": str(e)})
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 def verify_typing(window: str = None, hwnd: int = None, wait: float = 1.5,
                   interval: float = 0.25, region: str = None,
                   action: Union[dict, str, None] = None, ocr_check: bool = False,
@@ -837,7 +865,7 @@ def verify_typing(window: str = None, hwnd: int = None, wait: float = 1.5,
         return _文本({"ok": False, "action": "verify_typing", "error": str(e)})
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 def probe_hang(window: str = None, hwnd: int = None, key: str = "esc",
                wait: float = 2.0, resend_after: float = 0.7,
                focus: bool = True) -> str:
@@ -866,7 +894,7 @@ def probe_hang(window: str = None, hwnd: int = None, key: str = "esc",
         return _文本({"ok": False, "action": "probe_hang", "error": str(e)})
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 def split_static_dynamic(window: str = None, hwnd: int = None, frames: int = 8,
                          interval: float = 0.5, std_thresh: float = 12.0,
                          moving_min_dist: float = 15.0, verify_ocr: bool = False,
@@ -903,7 +931,7 @@ def split_static_dynamic(window: str = None, hwnd: int = None, frames: int = 8,
 
 # ---------------- 收台机制两件（2026-11-06 登记-清理两段式）----------------
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 def register_window(window: str, close_candidate: bool = True) -> str:
     """登记窗口进会话账本（收台机制·显式登记）——收尾 cleanup_windows 会温和关它。
 
@@ -929,7 +957,7 @@ def register_window(window: str, close_candidate: bool = True) -> str:
                      "error": str(e)})
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 def cleanup_windows(targets: list = None, force: bool = False) -> str:
     """收台清理（任务收尾调用）——按会话账本温和关窗，全程 WM_CLOSE 无 taskkill。
 

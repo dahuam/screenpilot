@@ -63,9 +63,13 @@ async def main():
             tools = await session.list_tools()
             名单 = sorted(t.name for t in tools.tools)
             print(f"[2] tools/list: {名单}")
-            记("八工具齐全", 名单 == ["activate_window", "click_element", "click_xy",
-                                "press_key", "scan_screen", "scroll_screen",
-                                "snap_screen", "type_text"])
+            # 2026-11-15 修测试腐化：工具面 11-06 收台批已 18→20 件，写死
+            # 8 件全等断言必然挂；改「八核心工具包含」断言（核心在=通道
+            # 健康，工具面扩容不再误报）
+            记("八核心工具齐全", set(["activate_window", "click_element",
+                                "click_xy", "press_key", "scan_screen",
+                                "scroll_screen", "snap_screen",
+                                "type_text"]) <= set(名单))
 
             r = await session.call_tool("activate_window", {"window": "计算器"})
             d = json.loads(r.content[0].text)

@@ -374,6 +374,41 @@ def _compact滤选(元素):
     return 出, 滤空数, len(保留) - len(出)
 
 
+_BTN前缀 = "[btn] "
+
+
+def 同名可点标注(元素dicts):
+    """显示层同名消歧标注（2026-11-15 体感账·识屏接力派单）。
+
+    场景：侧栏 text「新建任务」与底部 button「新建任务」同名并存（不同位，
+    compact 去重不合并），agent 首次按文字元素点落空。同归一文本既有点
+    元素（clickable 或可交互类型）又有非点元素（纯文字）时，给可点元素的
+    显示文本加 "[btn] " 前缀——可点与否一眼可辨。
+
+    只改传入的显示副本：调用方必须在元素缓存落盘之后调用（缓存原件、
+    编号、bbox、入库 text 一律不动）；expect 是子串匹配，前缀不影响命中。
+    原地修改，返回标注数。
+    """
+    def _可点(d):
+        return bool(d.get("clickable")) or d.get("type") in _COMPACT可交互类型
+
+    组 = {}
+    for d in 元素dicts:
+        归一 = _compact归一文本(d.get("text"))
+        if 归一:
+            组.setdefault(归一, []).append(d)
+    标注数 = 0
+    for 同文 in 组.values():
+        可点 = [d for d in 同文 if _可点(d)]
+        纯文字 = [d for d in 同文 if not _可点(d)]
+        if 可点 and 纯文字:
+            for d in 可点:
+                if not str(d.get("text", "")).startswith(_BTN前缀):
+                    d["text"] = _BTN前缀 + d["text"]
+                    标注数 += 1
+    return 标注数
+
+
 def scan(win=None, no_focus=False, max_nodes=800, no_uia=False, no_ocr=False,
          no_visual=False, background=False, hwnd=None, tracker_state=None,
          incremental=None, no_book=None, compact=None):

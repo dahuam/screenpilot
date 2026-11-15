@@ -138,6 +138,9 @@ def do_scan(args):
         标注路径 = None
         meta["annotate_error"] = str(e)
 
+    # 同名可点标注（体感账 2026-11-15 接力派单）：缓存已落盘（_写json），
+    # 只改返回副本；标注图已用原始文本生成，不受影响
+    pipeline.同名可点标注(缓存["elements"])
     输出 = {"meta": dict(meta), "elements": 缓存["elements"]}
     输出["meta"]["elements_json"] = os.path.abspath(args.out)
     输出["meta"]["annotated_png"] = 标注路径
@@ -214,6 +217,9 @@ def do_click(args):
 
     --expect 传 JSON 条件做业务生效判定（如 '{"find":"保存成功","mode":"appear"}'）：
     点击发出后轮询扫描等待，超时如实返回未命中（ok=false + expect 报告）。
+    appear 默认带动作前基线差分（diff:true）只认动作后新增命中，防「正文含
+    判据词假命中」；要「已存在即成功」传 "diff":false（基线取自同窗 60s 内
+    scan 缓存，不可用自动退回全文匹配并在 expect.diff_note 注明）。
     物理点击默认落点归窗核验（--no-check-top 关）：落点最顶层窗不是目标窗
     （被遮挡）就拒绝点击并报 top_window，防「点了也不知道点到谁」。
     """
